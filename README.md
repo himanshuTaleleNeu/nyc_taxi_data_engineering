@@ -2,6 +2,8 @@
 
 This project demonstrates an end-to-end pipeline for processing NYC Green Taxi data using Azure Data Factory, Azure Data Lake, and Databricks. The architecture follows the **Medallion** design with Bronze, Silver, and Gold layers.
 
+   <img src="./images/architecture.png" alt="architecture" width="800"/>
+
 ---
 
 ## Project Overview
@@ -9,13 +11,15 @@ This project demonstrates an end-to-end pipeline for processing NYC Green Taxi d
 - **Source Data**: NYC Green Taxi 2023 trip records ([NYC TLC Data](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page))
 - **Objective**: Automate data ingestion, transformation, and storage across Azure services.
 - **Architecture**:
-  - **Bronze Layer**: Raw data ingestion.
-  - **Silver Layer**: Transformed and cleaned data.
-  - **Gold Layer**: Aggregated and optimized data for analytics.
+    1. **Bronze Layer**: Raw data ingestion from NYC Taxi API.
+    2. **Silver Layer**: Data cleaning and transformation in Databricks.
+    3. **Gold Layer**: Aggregated and optimized data for analytics.
 - **Tools & Technologies**:
-  - Azure Data Factory
-  - Azure Data Lake Storage (ADLS)
-  - Databricks with PySpark
+    - **Azure Data Factory**: For orchestrating data ingestion pipelines.
+    - **Azure Data Lake Storage**: For storing raw, cleaned, and transformed datasets.
+    - **Databricks**: For processing and transforming data using PySpark.
+    - **Delta Lake**: For optimized storage, versioning, and efficient querying in the Gold layer.
+    - **PySpark**: For distributed data processing and transformation.
 - **File Format**: Parquet (columnar format optimized for big data).
 
 ---
@@ -195,7 +199,7 @@ Once the Service Principal is set up and configured, use its credentials in Data
 
    <img src="./images/databricks_1.png" alt="databricks_1" width="800"/>
 
-#### 4. Connect Databricks to Data Lake**:
+#### 4. Connect Databricks to Data Lake:
    - Use the following PySpark configuration in Databricks notebooks:
      ```python
      spark.conf.set("fs.azure.account.auth.type.<storage-account>.dfs.core.windows.net", "OAuth")
@@ -222,5 +226,37 @@ Once the Service Principal is set up and configured, use its credentials in Data
 
 ---
 
+### Phase 3: Data Aggregation (Gold Layer)
 
+1. **Silver-to-Gold Transformations**:
+    - Aggregating and optimizing datasets for analytics using PySpark and Delta Lake.
+    - Performing advanced transformations and creating derived metrics (e.g., average revenue, trip duration).
+    - Writing the processed data to the Gold layer in Delta format for improved performance.
+    - Generating analytical views to support business intelligence and reporting needs.
 
+2. **Data Outputs**:
+   - Store the final data in the `gold` container for easy access by BI tools.
+   - Enable efficient storage and querying of large datasets through optimized Delta format.
+   - Support advanced features like data versioning, schema enforcement, and fast updates for analytical workflows.
+
+---
+
+## Key Features of the overall project
+
+1. **Dynamic Data Ingestion**:
+   - Automates the downloading of monthly data using ADF pipelines.
+2. **Transformations with PySpark**:
+   - Handles data cleaning and standardization in the Silver layer.
+3. **Optimized Storage**:
+   - Parquet format ensures efficient storage and query performance.
+4. **Scalable Architecture**:
+   - Medallion architecture supports future scalability.
+
+---
+
+### Future Enhancements
+- Automating pipeline deployments using Infrastructure as Code (e.g., Terraform).
+- Adding real-time data ingestion using Azure Event Hubs.
+- Incorporating additional datasets for enriched analytics.
+
+--- 
