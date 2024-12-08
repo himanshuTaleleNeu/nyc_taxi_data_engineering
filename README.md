@@ -73,5 +73,154 @@ This project demonstrates an end-to-end pipeline for processing NYC Green Taxi d
 
     <img src="./images/linked_service_2.png" alt="linked_service_2" width="800"/>
 
+5. **ADF Pipeline for Data Ingestion**:
+   - Now navigate to factory resources tab in DF and create a new pipeline then enter the name.
+   - From activity tab drag the **Copy Data** activity and name it.
+   - Now configure parameters to automate fetching files for each month dynamically:
+     - click on source tab inside the copy data activity, source will help to get the particular file/dataset from the connection/linkedservice, click the + New it will help to create the new dataset, then type HTTP  —>> continue, select file type as Parquet.
+          
+    - Source: HTTP Parquet files 
+    <img src="./images/set_properties_1.png" alt="set_properties_1" width="800"/>
+
+     - Now it’s time to create a sink dataset. So, for sink select ADLSGen2 and followed with the filetype parquet.
+
+     - Sink: ADLS Parquet files in the `bronze` container.
+    <img src="./images/set_properties_2.png" alt="set_properties_2" width="800"/>
+
+  - Now till the above step the only one file or only one month file is got dumped or populated in our bronze / raw data container, so now will implement for all the months. 
+   - Add **ForEach Activity** to iterate through all months (1 to 12).
+  - So drag the If condition activity and ForEach Activity from activity tab and paste the copy data activity in false activity  and write the expression -> @greater(item(),9)
+    in if condition. 
+
+    <img src="./images/for_each.png" alt="for_each" width="800"/>
+  
+  - To iterate through all the months files, need to pass the parameter to run the pipeline as a dynamic. 
+  - Again navigate to copy data source tab and select the open which is next to source dataset dropdown ->>pen/pencil symbol and then go to parameter tab for parametrized dataset.
+
+    <img src="./images/parameter_1.png" alt="parameter_1" width="800"/>
+    <img src="./images/parameter_2.png" alt="parameter_2" width="800"/>
+   
+   - As the now then select the connection tab and click the URL which will enable a option to  Add dynamic content -
+   ```sql
+   trip-data/green_tripdata_2023-0@{dataset().p_month}.parquet
+   ```
+   - so here  dataset().p_month is a variable which is passed in the parameter.
+     
+     <img src="./images/parameter_3.png" alt="parameter_3" width="800"/>
+
+   - Now to iterate for all 12 month we need a ForEach activity so drag the ForEach activity from Activities. 
+   - In settings tab select check box the **sequential** to get the data load sequentially & in items add the dynamic connect and under function tab select range() function to define the **range(1,12)**. i.e i will run the loop from  1 till 12.  
+
+     <img src="./images/parameter_4.png" alt="parameter_4" width="800"/>
+
+   - And then cut the copy data activity and paste in ForEach loop activities.
+
+     <img src="./images/ForEach_1.png" alt="ForEach_1" width="800"/>
+
+   - Now navigate to copy data activity underForEach  and click the Add the dynamic content in Dataset properties value textbox write the **@item()** and thus it will get the iterated value and load all the files.
+     
+     <img src="./images/item_1.png" alt="item_1" width="800"/>
+
+   - Run the pipeline in debug mode and publish all.
+     <img src="./images/final_data_dump.png" alt="final_data_dump" width="800"/>
+     
+
+---
+
+### Phase 2: Raw to Silver Data Transformation (Silver Layer)
+## Setting Up Data Access with Databricks and Service Principal
+
+In this phase, raw data from the Bronze layer is read, transformed, and saved into the Silver and Gold layers using Databricks and PySpark.
+
+To enable Databricks to read and write data to Azure Data Lake, a **Service Principal** is created and configured. This allows secure access to the Data Lake with the necessary permissions.
+
+---
+
+### Key Steps
+
+#### 1. Why Use a Service Principal?
+- A **Service Principal** acts as an application identity that allows Databricks to securely read from and write to Azure Data Lake.
+- It ensures proper access control and avoids hardcoding sensitive credentials directly into scripts.
+
+---
+
+#### 2. Creating a Service Principal
+Follow these steps to create a Service Principal in Azure:
+
+1. **Navigate to Microsoft Entra ID**:
+   - Open the Azure Portal.
+   - Go to **Microsoft Entra ID** > **App Registrations**.
+
+2. **Register a New Application**:
+   - Click on **New Registration**.
+   - Enter a name for the application (e.g., `DatabricksServicePrincipal`).
+   - Complete the registration process.
+
+3. **Validate the Application**:
+   - Once created, validate the application details.
+
+---
+
+#### 3. Assign Roles to the Service Principal
+The Service Principal needs specific permissions to access Azure Data Lake. Follow these steps:
+
+1. **Navigate to the Storage Account**:
+   - Go to the storage account linked to your Data Lake.
+
+2. **Assign the Necessary Role**:
+   - Go to **Access Control (IAM)**.
+   - Add a **Role Assignment** with the following details:
+     - **Role**: `Storage Blob Data Contributor`
+     - **Member**: Select the Service Principal created in the previous step.
+   - This role allows the Service Principal to read, write, and delete data in the Azure Storage Blob containers.
+
+    <img src="./images/service_role.png" alt="service_role" width="800"/>
+---
+
+### Key Role of the Service Principal in the Project
+- Enables Databricks to:
+  - Read raw data from the Bronze layer.
+  - Apply transformations and create structured data for the Silver layer.
+  - Generate analytical data for the Gold layer.
+- Ensures secure and efficient access to Azure Data Lake.
+
+---
+
+### Next Steps
+Once the Service Principal is set up and configured, use its credentials in Databricks to connect to the Data Lake. This setup is essential for performing data transformations and analytics in subsequent phases.
+
+  **Databricks workspace and cluster setup**
+  
+   <img src="./images/Create an Azure Databricks workspace.png" alt="workspace" width="800"/>
+
+   <img src="./images/databricks_1.png" alt="databricks_1" width="800"/>
+
+#### 4. Connect Databricks to Data Lake**:
+   - Use the following PySpark configuration in Databricks notebooks:
+     ```python
+     spark.conf.set("fs.azure.account.auth.type.<storage-account>.dfs.core.windows.net", "OAuth")
+     spark.conf.set("fs.azure.account.oauth.provider.type.<storage-account>.dfs.core.windows.net", 
+                    "org.apache.hadoop.fs.azurebfs.oauth2.ClientCredsTokenProvider")
+     spark.conf.set("fs.azure.account.oauth2.client.id.<storage-account>.dfs.core.windows.net", "<application-id>")
+     spark.conf.set("fs.azure.account.oauth2.client.secret.<storage-account>.dfs.core.windows.net", service_credential)
+     spark.conf.set("fs.azure.account.oauth2.client.endpoint.<storage-account>.dfs.core.windows.net", 
+                    "https://login.microsoftonline.com/<directory-id>/oauth2/token")
+     ```
+   - Replace placeholders with:
+     - `<storage-account>`: Storage account name
+     - `<application-id>`: Client ID
+     - `<directory-id>`: Tenant ID
+     - `service_credential`: Secret value.
+
+    **Transform Data in Silver Layer**:
+
+    The Raw_to_Silver_Notebook file processes raw data from the Bronze layer by:
+    - Cleaning and transforming datasets using PySpark.
+    - Renaming columns, fixing missing and invalid values, and deriving new fields (e.g., trip duration).
+    - Dropping unnecessary columns and standardizing data formats.
+    - Saving the cleaned and structured data into the Silver layer in Parquet format for further analysis.
+
+---
+
 
 
